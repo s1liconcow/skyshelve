@@ -2,11 +2,15 @@ import os
 import platform
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+SRC_ROOT = PROJECT_ROOT / "src"
+if str(SRC_ROOT) not in sys.path:
+    sys.path.insert(0, str(SRC_ROOT))
 
 
 def _shared_library_name() -> str:
@@ -20,7 +24,9 @@ def _shared_library_name() -> str:
 
 def _build_shared_library(tmp_path_factory) -> Path:
     lib_name = _shared_library_name()
-    lib_path = PROJECT_ROOT / lib_name
+    pkg_dir = SRC_ROOT / "badgerdict"
+    pkg_dir.mkdir(parents=True, exist_ok=True)
+    lib_path = pkg_dir / lib_name
     if lib_path.exists():
         return lib_path
 
@@ -31,7 +37,7 @@ def _build_shared_library(tmp_path_factory) -> Path:
     gocache = tmp_path_factory.mktemp("gocache")
     env["GOCACHE"] = str(gocache)
     result = subprocess.run(
-        ["go", "build", "-buildmode=c-shared", "-o", lib_name],
+        ["go", "build", "-buildmode=c-shared", "-o", str(lib_path)],
         cwd=PROJECT_ROOT,
         env=env,
         capture_output=True,

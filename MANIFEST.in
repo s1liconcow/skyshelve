@@ -1,0 +1,8 @@
+include README.md
+include LICENSE
+include go.mod
+include go.sum
+include badgerdict.go
+recursive-include src/badgerdict libbadgerdict.*
+recursive-include examples *.py
+recursive-include tests *.py

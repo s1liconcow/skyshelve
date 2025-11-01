@@ -5,6 +5,16 @@ libbadgerdict.so
 libbadgerdict.dylib
 libbadgerdict.dll
 
+src/badgerdict/libbadgerdict.h
+src/badgerdict/libbadgerdict.so
+src/badgerdict/libbadgerdict.dylib
+src/badgerdict/libbadgerdict.dll
+
+# Packaging outputs
+dist/
+build/
+src/badgerdict.egg-info/
+
 # Badger data directories created by examples/tests
 data/
 

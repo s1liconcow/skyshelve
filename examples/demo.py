@@ -6,8 +6,9 @@ from pathlib import Path
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
+SRC_ROOT = PROJECT_ROOT / "src"
+if str(SRC_ROOT) not in sys.path:
+    sys.path.insert(0, str(SRC_ROOT))
 
 from badgerdict import BadgerDict
 
@@ -15,9 +16,11 @@ from badgerdict import BadgerDict
 def simple_demo(store: BadgerDict) -> None:
     store["greeting"] = "hello world"
     store["count"] = b"\x00\x01"
+    store["settings"] = {"theme": "dark", "features": ["badger", "dict"]}
 
-    print("greeting:", store["greeting"].decode())
+    print("greeting:", store["greeting"])
     print("count bytes:", store["count"])
+    print("settings object:", store["settings"])
     print("contains 'missing'?", "missing" in store)
 
 
@@ -28,6 +31,7 @@ def run_benchmark(store: BadgerDict, workers: int = 8, ops_per_worker: int = 1_0
             payload = os.urandom(128)
             store[key] = payload
             _ = store[key]
+            store.sync()
 
     start = time.perf_counter()
     with ThreadPoolExecutor(max_workers=workers) as executor:
