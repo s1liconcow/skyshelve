@@ -28,16 +28,11 @@ def main() -> None:
     db_path = PROJECT_ROOT / "data" / "counter"
     lib_path = SRC_ROOT / "badgerdict" / "libbadgerdict.so"
     RunCounter.configure_storage(str(db_path), lib_path=str(lib_path))
+    counter = RunCounter.load("counter", default=RunCounter("counter"))
+    counter.value += 1
+    counter.save()
 
-    def bump(counter: RunCounter) -> None:
-        counter.value += 1
-
-    result = RunCounter.update(
-        "default",
-        default_factory=lambda: RunCounter("default", 0),
-        mutator=bump,
-    )
-    print(f"This script has been run {result.value} times.")
+    print(f"This script has been run {counter.value} times.")
 
 
 if __name__ == "__main__":
