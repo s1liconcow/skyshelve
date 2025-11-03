@@ -1,6 +1,8 @@
 package main
 
 /*
+#cgo LDFLAGS: -L${SRCDIR} -Wl,-rpath,${SRCDIR}
+#cgo LDFLAGS: -lslatedb_go
 #include <stdlib.h>
 #include <stdint.h>
 */
@@ -11,6 +13,7 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"

@@ -1,15 +1,27 @@
-"""Demonstrate selecting the SlateDB backend via the ``slatedb://`` URI.
+"""Demonstrate selecting the SlateDB backend via the ``slatedb:`` URI.
 
 This example expects the SlateDB Go bindings to be built so that
-``libslatedb_go`` is available in ``external/slatedb/target/release`` (see
-README instructions). When running on macOS or Linux, the script opportunistically
-injects that directory into the appropriate dynamic library search path so the
-compiled ``libskyshelve`` can locate SlateDB at import time.
+``libslatedb_go`` is available in ``external/slatedb/target/release`` (see the
+README instructions). When running on macOS or Linux, the script
+opportunistically injects that directory into the appropriate dynamic library
+search path so the compiled ``libskyshelve`` can locate SlateDB at import time.
+
+Environment overrides:
+
+- ``SKYSHELVE_PROVIDER``: Force ``local`` or ``aws`` (defaults to auto-detect).
+- ``SKYSHELVE_CACHE_PATH``: Local cache directory for SlateDB (defaults to
+  ``./data/slatedb-demo``).
+- ``BUCKET_NAME``: Target S3 bucket when using the AWS provider.
+- ``AWS_REGION`` / ``AWS_DEFAULT_REGION``: Region for the bucket.
+- ``AWS_ENDPOINT_URL_S3``: Optional S3-compatible endpoint.
+- ``AWS_ACCESS_KEY_ID`` / ``AWS_SECRET_ACCESS_KEY``: Standard AWS credentials
+  used by SlateDB when hitting S3.
 """
 
 from __future__ import annotations
 
 import ctypes
+import json
 import os
 import sys
 from pathlib import Path
@@ -20,7 +32,7 @@ if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
 SLATE_LIB_DIR = PROJECT_ROOT / "external" / "slatedb" / "target" / "release"
-SLATE_URI = f"slatedb://{PROJECT_ROOT / 'data' / 'slatedb-demo'}"
+DEFAULT_CACHE_PATH = PROJECT_ROOT / "data" / "slatedb-demo"
 
 
 def _ensure_native_library_visible() -> None:
@@ -89,7 +101,41 @@ def _preload_slate_library() -> None:
 
 _preload_slate_library()
 
-from skyshelve import PersistentObject, SkyShelve
+from skyshelve import PersistentObject, SkyShelve, SkyshelveError, slatedb_uri
+
+
+def _slatedb_config_uri() -> str:
+    provider_override = os.environ.get("SKYSHELVE_PROVIDER")
+    cache_path = os.environ.get("SKYSHELVE_CACHE_PATH", str(DEFAULT_CACHE_PATH)).strip()
+
+    if provider_override:
+        provider = provider_override.strip().lower()
+    else:
+        has_aws_creds = bool(os.environ.get("AWS_ACCESS_KEY_ID") and os.environ.get("AWS_SECRET_ACCESS_KEY"))
+        bucket_env = (os.environ.get("BUCKET_NAME") or os.environ.get("AWS_S3_BUCKET") or "").strip()
+        provider = "aws" if has_aws_creds and bucket_env else "local"
+
+    if provider not in {"local", "aws"}:
+        raise SystemExit(f"Unsupported SKYSHELVE_PROVIDER '{provider}' (use 'local' or 'aws')")
+
+    if provider == "aws":
+        bucket = (os.environ.get("BUCKET_NAME") or os.environ.get("AWS_S3_BUCKET") or "").strip()
+        region = (os.environ.get("AWS_REGION") or os.environ.get("AWS_DEFAULT_REGION") or "").strip()
+        if not bucket or not region:
+            raise SystemExit("BUCKET_NAME and AWS_REGION (or AWS_DEFAULT_REGION) must be set for AWS provider")
+        aws_cfg = {"bucket": bucket, "region": region}
+        endpoint = (os.environ.get("AWS_ENDPOINT_URL_S3") or "").strip()
+        if endpoint:
+            aws_cfg["endpoint"] = endpoint
+        store_cfg = {"provider": "aws", "aws": aws_cfg}
+    else:
+        store_cfg = {"provider": "local"}
+
+    return slatedb_uri(cache_path, store=store_cfg)
+
+
+SLATE_URI = _slatedb_config_uri()
+print(f"Using SlateDB at {SLATE_URI}")
 
 
 class LoginCounter(PersistentObject):
@@ -122,8 +168,6 @@ def log_login(username: str, region: str) -> None:
 
 
 def main() -> None:
-    _ensure_native_library_visible()
-
     with SkyShelve(SLATE_URI) as store:
         total_logins = store.get("total_logins", 0)
         store["total_logins"] = total_logins + 1
@@ -133,11 +177,16 @@ def main() -> None:
     log_login("alice", "us-west")
     log_login("bob", "eu-central")
     log_login("alice", "us-west")
-
     west_coast = LoginCounter.scan_index("region", "us-west")
     for user in west_coast:
         print(f"{user.username} has logged in {user.logins} time(s) from {user.region}")
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except SkyshelveError as exc:
+        detail = SkyShelve._last_error()
+        if detail:
+            print(f"SkyShelve reported: {detail}", file=sys.stderr)
+        raise

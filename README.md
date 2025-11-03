@@ -19,7 +19,8 @@ Python-friendly API.
 - `examples/scan_example.py` &mdash; Demonstrates scanning keys and persistent objects.
 - `examples/indexed_profiles.py` &mdash; Pydantic-backed parent/child models with secondary indexes.
 - `examples/simple_counter.py` &mdash; Uses `PersistentObject` to track run counts.
-- `examples/slatedb_backend.py` &mdash; Demonstrates opting into the SlateDB backend.
+- `examples/slatedb_backend.py` &mdash; Demonstrates opting into the SlateDB backend (local and AWS).
+- `scripts/build_shared.py` &mdash; Helper script for compiling the Go shared library with SlateDB linkage.
 
 ### Prerequisites
 - Go 1.20 or newer (Go 1.25 used while developing the library).
@@ -52,6 +53,9 @@ This will download both dependencies and produce an up-to-date `go.sum`.
 ### Building the shared library
 
 ```bash
+# Cross-platform helper (detects the output filename and wires in SlateDB linkage)
+python scripts/build_shared.py
+
 # Linux / macOS (run from the repository root)
 go build -buildmode=c-shared -o src/skyshelve/libskyshelve.so
 
@@ -117,8 +121,9 @@ print(User.children("email", "alice@example.com"))     # same as scan_index
 ### Using the SlateDB backend
 
 The same Python API can target [SlateDB](https://slatedb.io/) by passing a
-`slatedb:` URI-like path to `SkyShelve` or any `PersistentObject`
-configuration:
+`slatedb:` URI-like path (or JSON payload) to `SkyShelve` or any
+`PersistentObject` configuration. The helper `examples/slatedb_backend.py`
+demonstrates both the default local provider and AWS configuration.
 
 ```python
 from skyshelve import SkyShelve
@@ -129,17 +134,49 @@ with SkyShelve("slatedb://") as store:  # defaults to ./data/slatedb
 
 The path segment after `slatedb://` points to the SlateDB data directory. Use a
 JSON payload for advanced configuration—e.g.
-`"slatedb:{\"path\":\"/srv/slate\",\"store\":{\"provider\":\"s3\"}}"`—which
+`"slatedb:{\"path\":\"/srv/slate\",\"store\":{\"provider\":\"local\"}}"`—which
 is forwarded to the SlateDB Go client. When no path is supplied, the library
 stores data under `./data/slatedb` by default. Badger-backed stores still
 expect an explicit path unless you use `PersistentObject`, which defaults to
 `./data/<model-name>`.
 
+To target AWS S3 (or an S3-compatible provider) supply the AWS store
+configuration:
+
+```python
+import json
+from skyshelve import SkyShelve
+
+config = {
+    "path": "/tmp/slatedb-cache",
+    "store": {
+        "provider": "aws",
+        "aws": {
+            "bucket": "my-bucket",
+            "region": "us-west-2",
+            # Optional: "endpoint": "https://s3.us-west-2.amazonaws.com",
+        },
+    },
+}
+
+with SkyShelve(f"slatedb:{json.dumps(config)}") as store:
+    store["key"] = "value"
+```
+
+The `examples/slatedb_backend.py` script reads the standard AWS environment
+variables shown in `PROD_ENV.sh` (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`,
+`AWS_REGION`/`AWS_DEFAULT_REGION`, `AWS_ENDPOINT_URL_S3`, and `BUCKET_NAME`) to
+configure the AWS provider automatically. Override `SKYSHELVE_PROVIDER` or
+`SKYSHELVE_CACHE_PATH` if you need to force a provider or change the local
+cache location.
+
 SlateDB support relies on the upstream Go bindings. Build the native library in
 the SlateDB repository with `cargo build -p slatedb-go --release`, then ensure
 the resulting shared object (often `libslatedb_go.so`/`.dylib`/`.dll`) is
 discoverable at run time—typically by adding it to your system library path or
-placing it next to `libskyshelve` before running `go build`.
+placing it next to `libskyshelve` before running `go build`. The helper script
+`scripts/build_shared.py` automatically wires in the correct linker flags and
+`rpath` settings when SlateDB is present under `external/slatedb/`.
 
 To use an in-memory Badger store without touching disk, call
 `SkyShelve(None, in_memory=True)`.

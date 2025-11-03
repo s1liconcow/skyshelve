@@ -1,6 +1,7 @@
 import ctypes
 import importlib
 import dataclasses
+import json
 import os
 import pickle
 import struct
@@ -77,7 +78,15 @@ class _FileLock:
         self.release()
 
 
-__all__ = ["SkyShelve", "SkyshelveError", "PersistentObject", "persistent_model", "BadgerDict", "BadgerError"]
+__all__ = [
+    "SkyShelve",
+    "SkyshelveError",
+    "PersistentObject",
+    "persistent_model",
+    "BadgerDict",
+    "BadgerError",
+    "slatedb_uri",
+]
 
 
 class SkyshelveError(Exception):
@@ -400,6 +409,48 @@ BadgerDict = SkyShelve
 BadgerError = SkyshelveError
 
 
+def slatedb_uri(path: str, *, store: Optional[Dict[str, Any]] = None) -> str:
+    """Utility to format a SlateDB configuration string for :class:`SkyShelve`.
+
+    Args:
+        path: Local cache directory passed to SlateDB.
+        store: Optional store configuration dictionary mirroring
+            :class:`slatedb.StoreConfig`. Use ``{"provider": "aws", "aws": {...}}``
+            for AWS.
+
+    Returns:
+        A ``slatedb:`` URI string suitable for ``SkyShelve`` or
+        ``PersistentObject`` configuration.
+    """
+
+    payload: Dict[str, Any] = {"path": path}
+    if store:
+        payload["store"] = store
+    return f"slatedb:{json.dumps(payload)}"
+
+
+def _extract_slatedb_cache_root(uri: str) -> Optional[str]:
+    if not uri.startswith("slatedb:"):
+        return None
+
+    remainder = uri[len("slatedb:") :]
+    if remainder.startswith("//"):
+        return remainder[2:]
+
+    remainder = remainder.strip()
+    if remainder.startswith("{"):
+        try:
+            payload = json.loads(remainder)
+        except json.JSONDecodeError:
+            return None
+        cache_path = payload.get("path")
+        if isinstance(cache_path, str) and cache_path:
+            return cache_path
+        return None
+
+    return remainder or None
+
+
 class PersistentObject:
     """Base class for SkyShelve-backed persistent records with inter-process safety.
 
@@ -490,17 +541,27 @@ class PersistentObject:
                 class name.
         """
 
+        cache_root: Optional[Path] = None
+
         if not in_memory:
             if not path:
                 namespace_hint = namespace or cls.__name__
                 default_root = Path.cwd() / "data" / namespace_hint.lower()
                 path = str(default_root)
-            resolved = Path(path).expanduser().resolve()
-            resolved.mkdir(parents=True, exist_ok=True)
+            if path.startswith("slatedb:"):
+                cls._storage_path = path
+                cache_root_str = _extract_slatedb_cache_root(path)
+                if cache_root_str:
+                    cache_root = Path(cache_root_str).expanduser().resolve()
+                    cache_root.mkdir(parents=True, exist_ok=True)
+            else:
+                cache_root = Path(path).expanduser().resolve()
+                cache_root.mkdir(parents=True, exist_ok=True)
+                cls._storage_path = cache_root
         else:
-            resolved = None
+            cache_root = None
+            cls._storage_path = None
 
-        cls._storage_path = resolved
         cls._storage_in_memory = in_memory
         cls._storage_lib_path = lib_path
         cls._storage_auto_pickle = auto_pickle
@@ -511,10 +572,11 @@ class PersistentObject:
         elif in_memory:
             temp_dir = Path(tempfile.gettempdir())
             cls._lock_path = temp_dir / f"skyshelve-{cls.__name__}.lock"
-        elif resolved is not None:
-            cls._lock_path = resolved / f".{cls.__name__.lower()}.lock"
+        elif cache_root is not None:
+            cls._lock_path = cache_root / f".{cls.__name__.lower()}.lock"
         else:
-            cls._lock_path = None
+            temp_dir = Path(tempfile.gettempdir())
+            cls._lock_path = temp_dir / f"skyshelve-{cls.__name__}.lock"
 
         if secondary_indexes:
             cls._ensure_index_dict()

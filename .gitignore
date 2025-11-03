@@ -4,22 +4,13 @@ libskyshelve.h
 libskyshelve.so
 libskyshelve.dylib
 libskyshelve.dll
+libslatedb_go.so
 
 src/skyshelve/libskyshelve.h
 src/skyshelve/libskyshelve.so
 src/skyshelve/libskyshelve.dylib
 src/skyshelve/libskyshelve.dll
 
-# Legacy build outputs kept for backward compatibility
-libbadgerdict.h
-libbadgerdict.so
-libbadgerdict.dylib
-libbadgerdict.dll
-
-src/badgerdict/libbadgerdict.h
-src/badgerdict/libbadgerdict.so
-src/badgerdict/libbadgerdict.dylib
-src/badgerdict/libbadgerdict.dll
 
 # Packaging outputs
 dist/
@@ -39,3 +30,6 @@ data/
 __pycache__/
 .pytest_cache/
 .gocache
+
+# Environment secrets
+PROD_ENV.sh
