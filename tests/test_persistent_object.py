@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from badgerdict import PersistentObject
+from skyshelve import PersistentObject
 
 
 class Note(PersistentObject):

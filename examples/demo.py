@@ -10,10 +10,10 @@ SRC_ROOT = PROJECT_ROOT / "src"
 if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
-from badgerdict import BadgerDict
+from skyshelve import SkyShelve
 
 
-def simple_demo(store: BadgerDict) -> None:
+def simple_demo(store: SkyShelve) -> None:
     store["greeting"] = "hello world"
     store["count"] = b"\x00\x01"
     store["settings"] = {"theme": "dark", "features": ["badger", "dict"]}
@@ -24,7 +24,7 @@ def simple_demo(store: BadgerDict) -> None:
     print("contains 'missing'?", "missing" in store)
 
 
-def run_benchmark(store: BadgerDict, workers: int = 8, ops_per_worker: int = 1_000) -> None:
+def run_benchmark(store: SkyShelve, workers: int = 8, ops_per_worker: int = 1_000) -> None:
     def worker(worker_id: int) -> None:
         for i in range(ops_per_worker):
             key = f"bench-{worker_id}-{i}".encode()
@@ -49,7 +49,7 @@ def main() -> None:
     db_path = Path("data").resolve()
     db_path.mkdir(parents=True, exist_ok=True)
 
-    with BadgerDict(str(db_path)) as store:
+    with SkyShelve(str(db_path)) as store:
         simple_demo(store)
         run_benchmark(store)
         store.sync()

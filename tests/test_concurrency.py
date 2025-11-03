@@ -11,13 +11,13 @@ def _random_payload(size: int) -> bytes:
     return os.urandom(size)
 
 
-def test_concurrent_writers(badger_dict_factory):
+def test_concurrent_writers(skyshelve_factory):
     worker_count = 16
     items_per_worker = 200
     written = {}
     write_lock = threading.Lock()
 
-    with badger_dict_factory() as store:
+    with skyshelve_factory() as store:
         errors = []
 
         def worker(worker_id: int) -> None:
@@ -46,15 +46,15 @@ def test_concurrent_writers(badger_dict_factory):
         store.sync()
 
     # Reopen to verify persistence
-    with badger_dict_factory() as reopened:
+    with skyshelve_factory() as reopened:
         for key, expected in written.items():
             assert reopened[key] == expected
 
 
 @pytest.mark.parametrize("worker_count,ops_per_worker", [(8, 500), (4, 1000)])
-def test_mixed_random_workload(worker_count, ops_per_worker, badger_dict_factory):
+def test_mixed_random_workload(worker_count, ops_per_worker, skyshelve_factory):
     keys = [f"key-{i}".encode() for i in range(64)]
-    with badger_dict_factory(in_memory=True) as store:
+    with skyshelve_factory(in_memory=True) as store:
         errors = []
         stats = Counter()
         lock = threading.Lock()

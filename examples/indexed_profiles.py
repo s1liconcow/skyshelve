@@ -14,11 +14,12 @@ SRC_ROOT = PROJECT_ROOT / "src"
 if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
-from badgerdict import PersistentBaseModel
+from skyshelve import PersistentBaseModel
 
 
 class ToDo(PersistentBaseModel):
     __persistent_key_field__ = "id"
+    __persistent_path__ = str(PROJECT_ROOT / "data" / "profiles" / "todos")
     __persistent_secondary_indexes__ = {"user": lambda todo: [todo.user_id]}
 
     id: str
@@ -33,6 +34,7 @@ class ToDo(PersistentBaseModel):
 
 class UserProfile(PersistentBaseModel):
     __persistent_key_field__ = "username"
+    __persistent_path__ = str(PROJECT_ROOT / "data" / "profiles" / "users")
     __persistent_secondary_indexes__ = {
         "email": lambda profile: [profile.email],
         "tag": lambda profile: profile.tags,

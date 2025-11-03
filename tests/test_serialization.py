@@ -4,9 +4,9 @@ from datetime import datetime
 import pytest
 
 
-def test_store_various_types(badger_dict_factory):
+def test_store_various_types(skyshelve_factory):
     payload = {"numbers": [1, 2, 3], "ts": datetime(2025, 11, 1, 12, 0, 0)}
-    with badger_dict_factory(in_memory=True) as store:
+    with skyshelve_factory(in_memory=True) as store:
         store["raw-bytes"] = b"\x00\x01"
         store["text"] = "hello"
         store["object"] = payload
@@ -28,9 +28,9 @@ def test_store_various_types(badger_dict_factory):
 
 
 def test_auto_pickle_disabled(shared_library, tmp_path):
-    from badgerdict import BadgerDict
+    from skyshelve import SkyShelve
 
-    store = BadgerDict(None, in_memory=True, lib_path=str(shared_library), auto_pickle=False)
+    store = SkyShelve(None, in_memory=True, lib_path=str(shared_library), auto_pickle=False)
     store["raw"] = b"bytes-ok"
     store["text"] = "hi"
     assert store["raw"] == b"bytes-ok"

@@ -1,5 +1,16 @@
 
 # Build artifacts
+libskyshelve.h
+libskyshelve.so
+libskyshelve.dylib
+libskyshelve.dll
+
+src/skyshelve/libskyshelve.h
+src/skyshelve/libskyshelve.so
+src/skyshelve/libskyshelve.dylib
+src/skyshelve/libskyshelve.dll
+
+# Legacy build outputs kept for backward compatibility
 libbadgerdict.h
 libbadgerdict.so
 libbadgerdict.dylib
@@ -13,7 +24,13 @@ src/badgerdict/libbadgerdict.dll
 # Packaging outputs
 dist/
 build/
+src/skyshelve.egg-info/
 src/badgerdict.egg-info/
+
+# Local toolchain + external dependencies
+.cargo/
+.rustup/
+external/
 
 # Badger data directories created by examples/tests
 data/

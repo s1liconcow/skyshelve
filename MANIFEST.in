@@ -2,7 +2,7 @@ include README.md
 include LICENSE
 include go.mod
 include go.sum
-include badgerdict.go
-recursive-include src/badgerdict libbadgerdict.*
+include skyshelve.go
+recursive-include src/skyshelve libskyshelve.*
 recursive-include examples *.py
 recursive-include tests *.py

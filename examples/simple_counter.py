@@ -8,7 +8,7 @@ SRC_ROOT = PROJECT_ROOT / "src"
 if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
-from badgerdict import PersistentObject
+from skyshelve import PersistentObject
 
 
 class RunCounter(PersistentObject):
@@ -26,7 +26,7 @@ class RunCounter(PersistentObject):
 
 def main() -> None:
     db_path = PROJECT_ROOT / "data" / "counter"
-    lib_path = SRC_ROOT / "badgerdict" / "libbadgerdict.so"
+    lib_path = SRC_ROOT / "skyshelve" / "libskyshelve.so"
     RunCounter.configure_storage(str(db_path), lib_path=str(lib_path))
     counter = RunCounter.load("counter", default=RunCounter("counter"))
     counter.value += 1

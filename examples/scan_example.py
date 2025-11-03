@@ -1,4 +1,4 @@
-"""Showcase scanning keys and objects stored in BadgerDict/PersistentObject."""
+"""Showcase scanning keys and objects stored in SkyShelve/PersistentObject."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ SRC_ROOT = PROJECT_ROOT / "src"
 if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
-from badgerdict import BadgerDict, PersistentObject
+from skyshelve import PersistentObject, SkyShelve
 
 
 class UserProfile(PersistentObject):
@@ -21,13 +21,13 @@ class UserProfile(PersistentObject):
         self.email = email
 
 
-def demo_badgerdict_scan(db_path: Path, lib_path: Path) -> None:
-    with BadgerDict(str(db_path), lib_path=str(lib_path)) as store:
+def demo_skyshelve_scan(db_path: Path, lib_path: Path) -> None:
+    with SkyShelve(str(db_path), lib_path=str(lib_path)) as store:
         store["user:alice"] = {"role": "admin", "active": True}
         store["user:bob"] = {"role": "analyst", "active": False}
         store["session:123"] = "temporary"
 
-        print("-- BadgerDict scan for prefix 'user:' --")
+        print("-- SkyShelve scan for prefix 'user:' --")
         for key_bytes, value in store.scan("user:"):
             key = key_bytes.decode("utf-8", "replace")
             print(f"{key} -> {value}")
@@ -49,9 +49,9 @@ def demo_persistent_object_scan(db_path: Path, lib_path: Path) -> None:
 def main() -> None:
     data_root = PROJECT_ROOT / "data" / "scan-demo"
     data_root.mkdir(parents=True, exist_ok=True)
-    lib_path = SRC_ROOT / "badgerdict" / "libbadgerdict.so"
+    lib_path = SRC_ROOT / "skyshelve" / "libskyshelve.so"
 
-    demo_badgerdict_scan(data_root / "kv", lib_path)
+    demo_skyshelve_scan(data_root / "kv", lib_path)
     demo_persistent_object_scan(data_root / "objects", lib_path)
 
 

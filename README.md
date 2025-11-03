@@ -1,18 +1,25 @@
-## BadgerDict: Persistent Python Mapping Backed by BadgerDB
+## Skyshelve: Backend-Agnostic Persistent Python Mapping
 
-This project exposes a minimal dictionary-shaped interface to [BadgerDB](https://github.com/dgraph-io/badger) from Python. The core is a Go library compiled in `c-shared` mode which provides a handful of exported functions that manage a Badger key-value store and offer CRUD primitives. A small `ctypes` shim (`src/badgerdict/__init__.py`) loads the shared object and presents a Python-friendly API.
+Skyshelve exposes a minimal dictionary-shaped interface to embedded key-value
+stores such as [BadgerDB](https://github.com/dgraph-io/badger) and
+[SlateDB](https://slatedb.io/). The core is a Go library compiled in
+`c-shared` mode which provides a handful of exported functions that manage the
+selected backend and offer CRUD primitives. A small `ctypes` shim
+(`src/skyshelve/__init__.py`) loads the shared object and presents a
+Python-friendly API.
 
 ### Layout
-- `badgerdict.go` &mdash; Go implementation of the shared library exports.
-- `src/badgerdict/__init__.py` &mdash; Python package exposing the `BadgerDict` class.
-- `src/badgerdict/libbadgerdict.*` &mdash; Platform-specific shared library produced by the Go compiler.
-- `PersistentObject` base class (in `src/badgerdict/__init__.py`) offers an
+- `skyshelve.go` &mdash; Go implementation of the shared library exports.
+- `src/skyshelve/__init__.py` &mdash; Python package exposing the `SkyShelve` class.
+- `src/skyshelve/libskyshelve.*` &mdash; Platform-specific shared library produced by the Go compiler.
+- `PersistentObject` base class (in `src/skyshelve/__init__.py`) offers an
   inheritable ORM-style helper that uses file locks so multiple processes can
   safely read and mutate shared records.
 - `examples/demo.py` &mdash; Minimal usage example.
 - `examples/scan_example.py` &mdash; Demonstrates scanning keys and persistent objects.
 - `examples/indexed_profiles.py` &mdash; Pydantic-backed parent/child models with secondary indexes.
 - `examples/simple_counter.py` &mdash; Uses `PersistentObject` to track run counts.
+- `examples/slatedb_backend.py` &mdash; Demonstrates opting into the SlateDB backend.
 
 ### Prerequisites
 - Go 1.20 or newer (Go 1.25 used while developing the library).
@@ -24,42 +31,44 @@ This project exposes a minimal dictionary-shaped interface to [BadgerDB](https:/
 The package is published on PyPI; install it with:
 
 ```bash
-pip install badgerdict
+pip install skyshelve
 ```
 
 You will still need a platform-appropriate Go build of the shared library if
 you are building from source or developing locally (see below).
 
-### Getting the Badger dependency
+### Getting backend dependencies
 
-The Go module requires `github.com/dgraph-io/badger/v4`. If you have network access, run:
+The Go module requires `github.com/dgraph-io/badger/v4` (always) and
+optionally `slatedb.io/slatedb-go` when you intend to use SlateDB. With
+network access, run:
 
 ```bash
 go mod tidy
 ```
 
-This will download Badger and produce an up-to-date `go.sum`.
+This will download both dependencies and produce an up-to-date `go.sum`.
 
 ### Building the shared library
 
 ```bash
 # Linux / macOS (run from the repository root)
-go build -buildmode=c-shared -o src/badgerdict/libbadgerdict.so
+go build -buildmode=c-shared -o src/skyshelve/libskyshelve.so
 
 # Windows (PowerShell)
-go build -buildmode=c-shared -o src/badgerdict/libbadgerdict.dll
+go build -buildmode=c-shared -o src/skyshelve/libskyshelve.dll
 ```
 
-The command produces two files inside `src/badgerdict/`: the shared library (`.so`/`.dll`) and a matching C header (`libbadgerdict.h`). Keep the header if you plan to integrate through other FFI layers.
+The command produces two files inside `src/skyshelve/`: the shared library (`.so`/`.dll`) and a matching C header (`libskyshelve.h`). Keep the header if you plan to integrate through other FFI layers.
 
 ### Using from Python
 
-Place the compiled shared library next to `src/badgerdict/__init__.py`, then interact with the store:
+Place the compiled shared library next to `src/skyshelve/__init__.py`, then interact with the store:
 
 ```python
-from badgerdict import BadgerDict
+from skyshelve import SkyShelve
 
-with BadgerDict("data") as store:
+with SkyShelve("data") as store:
     store["username"] = "alice"          # stored as UTF-8 text
     store["profile"] = {"plan": "pro"}  # auto-pickled
     store["avatar"] = b"\x89PNG"        # raw bytes stay bytes
@@ -70,9 +79,12 @@ with BadgerDict("data") as store:
     store.sync()                        # flush to disk
 ```
 
-By default the wrapper expects the shared library to be named `libbadgerdict.so`/`.dylib`/`.dll` in the same directory as the `badgerdict` package. If you relocate it, pass `lib_path="..."` when constructing `BadgerDict`.
+By default the wrapper expects the shared library to be named `libskyshelve.so`/`.dylib`/`.dll` in the same directory as the `skyshelve` package. If you relocate it, pass `lib_path="..."` when constructing `SkyShelve`.
 
-Values that are bytes-like or `str` are stored as-is; everything else is serialized with `pickle.dumps` by default. Disable that behaviour with `BadgerDict(..., auto_pickle=False)` if you need stricter type enforcement.
+**Compatibility note:** the class is also exported as `BadgerDict` for projects
+that previously depended on the old package name.
+
+Values that are bytes-like or `str` are stored as-is; everything else is serialized with `pickle.dumps` by default. Disable that behaviour with `SkyShelve(..., auto_pickle=False)` if you need stricter type enforcement.
 
 For richer models, inherit from `PersistentObject` and call
 `YourModel.configure_storage(...)` once per process, then use `save()`,
@@ -85,7 +97,7 @@ serializing models (and stdlib dataclasses) while keeping secondary indexes in
 sync:
 
 ```python
-from badgerdict import PersistentBaseModel
+from skyshelve import PersistentBaseModel
 
 
 class User(PersistentBaseModel):
@@ -102,7 +114,35 @@ print(User.scan_index("email", "alice@example.com"))  # -> [User(...)]
 print(User.children("email", "alice@example.com"))     # same as scan_index
 ```
 
-To use an in-memory Badger store without touching disk, call `BadgerDict(None, in_memory=True)`.
+### Using the SlateDB backend
+
+The same Python API can target [SlateDB](https://slatedb.io/) by passing a
+`slatedb:` URI-like path to `SkyShelve` or any `PersistentObject`
+configuration:
+
+```python
+from skyshelve import SkyShelve
+
+with SkyShelve("slatedb://") as store:  # defaults to ./data/slatedb
+    store["answer"] = 42
+```
+
+The path segment after `slatedb://` points to the SlateDB data directory. Use a
+JSON payload for advanced configuration—e.g.
+`"slatedb:{\"path\":\"/srv/slate\",\"store\":{\"provider\":\"s3\"}}"`—which
+is forwarded to the SlateDB Go client. When no path is supplied, the library
+stores data under `./data/slatedb` by default. Badger-backed stores still
+expect an explicit path unless you use `PersistentObject`, which defaults to
+`./data/<model-name>`.
+
+SlateDB support relies on the upstream Go bindings. Build the native library in
+the SlateDB repository with `cargo build -p slatedb-go --release`, then ensure
+the resulting shared object (often `libslatedb_go.so`/`.dylib`/`.dll`) is
+discoverable at run time—typically by adding it to your system library path or
+placing it next to `libskyshelve` before running `go build`.
+
+To use an in-memory Badger store without touching disk, call
+`SkyShelve(None, in_memory=True)`.
 
 ### Quick demo & throughput glimpse
 
@@ -118,7 +158,11 @@ The demo populates a store in `./data`, reads a few values, and runs a small thr
 pytest tests/test_concurrency.py
 ```
 
-The suite spins up multiple worker threads that hammer a single `BadgerDict` instance with random read/write/delete workloads, then verifies durability by reopening the store. Building the shared library is attempted automatically; if the Badger dependency has not been downloaded yet you will see a skip message reminding you to run `go mod tidy`.
+The suite spins up multiple worker threads that hammer a single `SkyShelve`
+instance with random read/write/delete workloads, then verifies durability by
+reopening the store. Building the shared library is attempted automatically;
+if the Go dependencies have not been downloaded yet you will see a skip
+message reminding you to run `go mod tidy`.
 
 ### Building wheels / sdists
 
@@ -129,7 +173,7 @@ python -m pip install build
 python -m build
 ```
 
-The resulting wheel embeds the shared object located in `src/badgerdict/`.
+The resulting wheel embeds the shared object located in `src/skyshelve/`.
 
 ### Automated releases
 
@@ -140,6 +184,6 @@ repository secret `PYPI_API_TOKEN` with an API token generated from your PyPI
 account before running the workflow.
 
 ### Cleanup & caveats
-- Always call `close()` (or use the context manager) to release the underlying Badger handle; Badger flushes outstanding writes on close.
+- Always call `close()` (or use the context manager) to release the underlying handle; the backend flushes outstanding writes on close.
 - Empty string keys are not supported by the wrapper.
-- If you need advanced Badger features (TTL, transactions, iteration), extend `badgerdict.go` with additional exported functions and surface them through `src/badgerdict/__init__.py`.
+- If you need advanced backend features (TTL, transactions, iteration), extend `skyshelve.go` with additional exported functions and surface them through `src/skyshelve/__init__.py`.

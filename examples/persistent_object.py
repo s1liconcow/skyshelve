@@ -10,7 +10,7 @@ SRC_ROOT = PROJECT_ROOT / "src"
 if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
-from badgerdict import PersistentObject
+from skyshelve import PersistentObject
 
 
 class TaskQueue(PersistentObject):
@@ -43,7 +43,7 @@ def _worker(db_path: str, lib_path: str, worker_id: int) -> None:
 
 def main() -> None:
     db_path = PROJECT_ROOT / "data" / "tasks"
-    lib_path = SRC_ROOT / "badgerdict" / "libbadgerdict.so"
+    lib_path = SRC_ROOT / "skyshelve" / "libskyshelve.so"
     TaskQueue.configure_storage(str(db_path), lib_path=str(lib_path))
 
     queue = TaskQueue("jobs")

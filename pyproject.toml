@@ -3,12 +3,12 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "badgerdict"
+name = "skyshelve"
 version = "0.1.0"
-description = "Persistent dictionary for Python backed by BadgerDB and a Go shared library"
+description = "Backend-agnostic persistent dictionary for Python with BadgerDB and SlateDB support"
 readme = "README.md"
 requires-python = ">=3.9"
-authors = [{ name = "BadgerDict Authors" }]
+authors = [{ name = "Skyshelve Authors" }]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
@@ -26,7 +26,11 @@ classifiers = [
 
 [tool.setuptools.packages.find]
 where = ["src"]
-include = ["badgerdict*"]
+include = ["skyshelve*"]
 
 [tool.setuptools.package-data]
-badgerdict = ["libbadgerdict.*"]
+skyshelve = ["libskyshelve.*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+norecursedirs = ["build", "dist", "external", ".cargo", ".rustup", "venv"]
